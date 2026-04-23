@@ -1,3 +1,5 @@
+import os
+
 # =============================================================================
 # SIMULATION DEFAULTS (overridable via CLI)
 # =============================================================================
@@ -21,15 +23,50 @@ DEFAULT_LLM_TEMPERATURE_USER = 0.0
 DEFAULT_LLM_ARGS_AGENT = {"temperature": DEFAULT_LLM_TEMPERATURE_AGENT}
 DEFAULT_LLM_ARGS_USER = {"temperature": DEFAULT_LLM_TEMPERATURE_USER}
 
-DEFAULT_LLM_NL_ASSERTIONS = "gpt-4.1-2025-04-14"
+def _build_llm_args(
+    temperature: float,
+    *,
+    api_key_env: str,
+    api_base_env: str,
+) -> dict:
+    args = {"temperature": temperature}
+    api_key = os.getenv(api_key_env)
+    api_base = os.getenv(api_base_env)
+    if api_key:
+        args["api_key"] = api_key
+    if api_base:
+        args["api_base"] = api_base
+    return args
+
+
+DEFAULT_LLM_NL_ASSERTIONS = os.getenv(
+    "TAU2_NL_ASSERTIONS_MODEL", "gpt-4.1-2025-04-14"
+)
 DEFAULT_LLM_NL_ASSERTIONS_TEMPERATURE = 0.0
-DEFAULT_LLM_NL_ASSERTIONS_ARGS = {"temperature": DEFAULT_LLM_NL_ASSERTIONS_TEMPERATURE}
+DEFAULT_LLM_NL_ASSERTIONS_ARGS = _build_llm_args(
+    DEFAULT_LLM_NL_ASSERTIONS_TEMPERATURE,
+    api_key_env="TAU2_NL_ASSERTIONS_API_KEY",
+    api_base_env="TAU2_NL_ASSERTIONS_API_BASE",
+)
 
-DEFAULT_LLM_ENV_INTERFACE = "gpt-4.1-2025-04-14"
+DEFAULT_LLM_ENV_INTERFACE = os.getenv(
+    "TAU2_ENV_INTERFACE_MODEL", "gpt-4.1-2025-04-14"
+)
 DEFAULT_LLM_ENV_INTERFACE_TEMPERATURE = 0.0
-DEFAULT_LLM_ENV_INTERFACE_ARGS = {"temperature": DEFAULT_LLM_ENV_INTERFACE_TEMPERATURE}
+DEFAULT_LLM_ENV_INTERFACE_ARGS = _build_llm_args(
+    DEFAULT_LLM_ENV_INTERFACE_TEMPERATURE,
+    api_key_env="TAU2_ENV_INTERFACE_API_KEY",
+    api_base_env="TAU2_ENV_INTERFACE_API_BASE",
+)
 
-DEFAULT_LLM_EVAL_USER_SIMULATOR = "claude-opus-4-5"
+DEFAULT_LLM_EVAL_USER_SIMULATOR = os.getenv(
+    "TAU2_EVAL_USER_MODEL", "claude-opus-4-5"
+)
+DEFAULT_LLM_EVAL_USER_SIMULATOR_ARGS = _build_llm_args(
+    0.0,
+    api_key_env="TAU2_EVAL_USER_API_KEY",
+    api_base_env="TAU2_EVAL_USER_API_BASE",
+)
 
 # LLM debug logging
 DEFAULT_LLM_LOG_MODE = "latest"  # Options: "all", "latest"
