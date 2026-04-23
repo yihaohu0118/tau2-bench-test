@@ -414,11 +414,113 @@ def generate(
         "tools": tools_schema,
         "tool_choice": tool_choice,
         "kwargs": {
-            k: str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v
+            (
+                "<set>"
+                if k == "api_key" and v
+                else str(v)
+                if not isinstance(v, (str, int, float, bool, type(None)))
+                else v
+            )
             for k, v in kwargs.items()
         },
     }
     request_timestamp = datetime.now().isoformat()
+
+    api_base = kwargs.get("api_base") or kwargs.get("base_url")
+    if isinstance(api_base, str) and "openrouter.ai" in api_base:
+        request_kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k
+            not in {
+                "api_key",
+                "api_base",
+                "base_url",
+                "custom_llm_provider",
+                "num_retries",
+            }
+        }
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": litellm_messages,
+            **request_kwargs,
+        }
+        if tools_schema:
+            payload["tools"] = tools_schema
+        if tool_choice is not None:
+            payload["tool_choice"] = tool_choice
+
+        start_time = time.perf_counter()
+        try:
+            response = httpx.post(
+                f"{api_base.rstrip('/')}/chat/completions",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {kwargs['api_key']}",
+                    "Content-Type": "application/json",
+                },
+                timeout=120.0,
+            )
+            response.raise_for_status()
+            response_json = response.json()
+        except Exception as e:
+            debug_kwargs = {}
+            for key in ("api_base", "api_key", "base_url", "custom_llm_provider"):
+                if key in kwargs:
+                    value = kwargs[key]
+                    if key == "api_key":
+                        value = "<set>" if value else "<missing>"
+                    debug_kwargs[key] = value
+            logger.error(
+                f"Direct OpenRouter call failed model={model} "
+                f"debug_kwargs={debug_kwargs}: {e}"
+            )
+            raise e
+
+        generation_time_seconds = time.perf_counter() - start_time
+        response_choice = response_json["choices"][0]
+        response_message = response_choice["message"]
+        content = response_message.get("content")
+        raw_tool_calls = response_message.get("tool_calls") or []
+        tool_calls = [
+            ToolCall(
+                id=tool_call["id"],
+                name=tool_call["function"]["name"],
+                arguments=json.loads(tool_call["function"]["arguments"]),
+            )
+            for tool_call in raw_tool_calls
+        ]
+        tool_calls = tool_calls or None
+
+        usage = response_json.get("usage")
+        usage_dict = None
+        if usage is not None:
+            usage_dict = {
+                "completion_tokens": usage.get("completion_tokens"),
+                "prompt_tokens": usage.get("prompt_tokens"),
+            }
+
+        message = AssistantMessage(
+            role="assistant",
+            content=content,
+            tool_calls=tool_calls,
+            cost=0.0,
+            usage=usage_dict,
+            raw_data=response_json,
+            generation_time_seconds=generation_time_seconds,
+        )
+
+        response_data = {
+            "timestamp": datetime.now().isoformat(),
+            "content": content,
+            "tool_calls": [tc.model_dump() for tc in tool_calls] if tool_calls else None,
+            "cost": 0.0,
+            "usage": usage_dict,
+            "generation_time_seconds": generation_time_seconds,
+        }
+        request_data["timestamp"] = request_timestamp
+        _write_llm_log(request_data, response_data, call_name=call_name)
+        return message
 
     start_time = time.perf_counter()
     try:
