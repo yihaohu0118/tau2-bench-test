@@ -3,10 +3,21 @@
 set -euo pipefail
 
 if [[ -f ".env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source ".env"
-  set +a
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    [[ -z "${line}" ]] && continue
+    [[ "${line}" =~ ^[[:space:]]*# ]] && continue
+    [[ "${line}" != *=* ]] && continue
+
+    key="${line%%=*}"
+    value="${line#*=}"
+
+    # Skip placeholder template values like <your_key_here>.
+    if [[ "${value}" =~ ^\<.*\>$ ]]; then
+      continue
+    fi
+
+    export "${key}=${value}"
+  done < ".env"
 fi
 
 AGENT_MODEL="${AGENT_MODEL:-openai/local-qwen25-7b}"
