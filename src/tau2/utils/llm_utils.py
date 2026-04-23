@@ -48,6 +48,8 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 
+_MISSING_COST_MAPPING_WARNED_MODELS: set[str] = set()
+
 # Configure httpx connection limits for LiteLLM
 httpx_limits = httpx.Limits(max_keepalive_connections=5, max_connections=10)
 litellm.client_session = httpx.Client(limits=httpx_limits)
@@ -126,6 +128,20 @@ def get_response_cost(response: ModelResponse) -> float:
     try:
         cost = completion_cost(completion_response=response)
     except Exception as e:
+        # Local / custom OpenAI-compatible models often don't exist in LiteLLM's
+        # pricing table. In that case, cost tracking is unavailable but the
+        # response itself is still valid, so avoid spamming the logs on every turn.
+        if "This model isn't mapped yet" in str(e):
+            model = response.model or "unknown"
+            if model not in _MISSING_COST_MAPPING_WARNED_MODELS:
+                logger.warning(
+                    "Cost tracking unavailable for model '{}'; defaulting agent "
+                    "cost to 0.0. Add a LiteLLM price mapping if you need cost "
+                    "reporting.",
+                    model,
+                )
+                _MISSING_COST_MAPPING_WARNED_MODELS.add(model)
+            return 0.0
         logger.error(e)
         return 0.0
     return cost
