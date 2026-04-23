@@ -74,6 +74,20 @@ if [[ -n "${USER_API_BASE}" ]]; then
 fi
 USER_LLM_ARGS="${USER_LLM_ARGS}}"
 
+if [[ -n "${USER_API_BASE}" && -n "${USER_API_KEY}" ]]; then
+  echo "Running user API preflight against ${USER_API_BASE}/models"
+  http_code="$(
+    curl -sS -o /tmp/tau2_user_models_check.json -w "%{http_code}" \
+      -H "Authorization: Bearer ${USER_API_KEY}" \
+      "${USER_API_BASE}/models"
+  )"
+  if [[ "${http_code}" != "200" ]]; then
+    echo "ERROR: user API preflight failed with HTTP ${http_code}" >&2
+    cat /tmp/tau2_user_models_check.json >&2 || true
+    exit 1
+  fi
+fi
+
 echo "Running tau2 text benchmark for core domains"
 echo "  agent model: ${AGENT_MODEL}"
 echo "  agent api base: ${AGENT_API_BASE}"
@@ -91,6 +105,8 @@ for domain in "${DOMAINS[@]}"; do
   save_to="${RUN_PREFIX}_${domain}"
   echo
   echo "=== Running domain: ${domain} ==="
+  OPENAI_API_KEY="${USER_API_KEY:-${OPENAI_API_KEY:-}}" \
+  OPENAI_API_BASE="${USER_API_BASE:-${OPENAI_API_BASE:-}}" \
   uv run tau2 run \
     --domain "${domain}" \
     --agent-llm "${AGENT_MODEL}" \
