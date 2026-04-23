@@ -106,6 +106,9 @@ for domain in "${DOMAINS[@]}"; do
   save_to="${RUN_PREFIX}_${domain}"
   echo
   echo "=== Running domain: ${domain} ==="
+  OPENAI_API_KEY="${USER_API_KEY:-${OPENAI_API_KEY:-}}" \
+  OPENAI_API_BASE="${USER_API_BASE:-${OPENAI_API_BASE:-}}" \
+  OPENROUTER_API_KEY="${USER_API_KEY:-${OPENROUTER_API_KEY:-}}" \
   uv run tau2 run \
     --domain "${domain}" \
     --agent-llm "${AGENT_MODEL}" \
