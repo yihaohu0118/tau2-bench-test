@@ -58,8 +58,9 @@ if [[ "${USER_MODEL}" == openrouter/* ]]; then
   if [[ -z "${USER_API_BASE}" ]]; then
     USER_API_BASE="https://openrouter.ai/api/v1"
   fi
-  # Route OpenRouter through its OpenAI-compatible endpoint.
-  USER_MODEL="openai/${USER_MODEL#openrouter/}"
+  # Route OpenRouter through its OpenAI-compatible endpoint using the raw
+  # OpenRouter model id, e.g. openai/gpt-4.1.
+  USER_MODEL="${USER_MODEL#openrouter/}"
 elif [[ "${USER_MODEL}" == gpt-* || "${USER_MODEL}" == openai/* ]]; then
   if [[ -z "${USER_API_KEY}" ]]; then
     require_env_var "OPENAI_API_KEY" \
@@ -105,8 +106,6 @@ for domain in "${DOMAINS[@]}"; do
   save_to="${RUN_PREFIX}_${domain}"
   echo
   echo "=== Running domain: ${domain} ==="
-  OPENAI_API_KEY="${USER_API_KEY:-${OPENAI_API_KEY:-}}" \
-  OPENAI_API_BASE="${USER_API_BASE:-${OPENAI_API_BASE:-}}" \
   uv run tau2 run \
     --domain "${domain}" \
     --agent-llm "${AGENT_MODEL}" \

@@ -430,7 +430,16 @@ def generate(
             **kwargs,
         )
     except Exception as e:
-        logger.error(e)
+        debug_kwargs = {}
+        for key in ("api_base", "api_key", "base_url", "custom_llm_provider"):
+            if key in kwargs:
+                value = kwargs[key]
+                if key == "api_key":
+                    value = "<set>" if value else "<missing>"
+                debug_kwargs[key] = value
+        logger.error(
+            f"LLM call failed model={model} debug_kwargs={debug_kwargs}: {e}"
+        )
         raise e
     generation_time_seconds = time.perf_counter() - start_time
     cost = get_response_cost(response)
